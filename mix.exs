@@ -29,7 +29,7 @@ defmodule GithubBlogCms.Mixfile do
   # Type "mix help deps" for more examples and options
   defp deps do
     [ {:httpotion, "~> 3.0.2"},
-      {:poison, "~> 3.1"},
+      {:poison, "~> 2.0"},
       {:earmark, "~> 1.1"},
       {:ex_doc, "~> 0.14", only: :dev, runtime: false}
     ]

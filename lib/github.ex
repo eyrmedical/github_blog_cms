@@ -1,5 +1,4 @@
-defmodule GithubBlogCms do
-  use GenServer
+defmodule Github do
   use HTTPotion.Base
   require Earmark
 
@@ -53,6 +52,9 @@ defmodule GithubBlogCms do
     |> Enum.map(fn post -> parse_post(post) end)
     |> Enum.filter(fn post -> post != :error end)
   end
+  def parse_posts(_), do: [:error]
+
+
   defp parse_post(%{"content" => content, "name" => filename}) do
     try do
       post = Base.decode64!(content, ignore: :whitespace)
@@ -65,9 +67,8 @@ defmodule GithubBlogCms do
       post = Earmark.as_html!(post)
 
       post = Regex.split(~r/\n/, frontmatter, trim: true)
-        |> Enum.map(&Regex.split(~r/:\s|:/, &1, trim: true) |> List.to_tuple)
+        |> Enum.map(&Regex.split(~r/:\s/, &1, trim: true) |> List.to_tuple)
         |> Enum.into(%{"post" => post, "filename" => filename})
-
 
       date_from_frontmatter = Map.get(post, "date")
       date_from_filename = Regex.run(~r/....-..-../, filename) |> List.to_string
@@ -82,81 +83,20 @@ defmodule GithubBlogCms do
   end
   defp parse_post(_), do: :error
 
-
   @doc """
   Check last updated_date towards a DateTime struct. If it is greater than
   current_date it will trigger getting and parsing posts.
   """
   @spec check_last_updated(String.t(), %DateTime{}) :: atom()
-  def check_last_updated(updated_at, current_date) do
-    case DateTime.from_iso8601(updated_at) do
-      {:ok, updated_at, _offset} -> DateTime.compare(updated_at, current_date)
-      _ -> :gt # Default to :gt to trigger getting posts
-    end
+  def check_last_updated(_pushed_at, :nil) do
+    IO.puts "[info] #{@user}/#{@repository} have not been updated yet."
+    :gt # default to get posts
   end
+  def check_last_updated(pushed_at, current_date) do
+    IO.puts "[info] #{@user}/#{@repository} was last updated at: #{pushed_at}"
 
-
-
-  def start_link do
-    GenServer.start_link(__MODULE__, %{:updated_at => :nil, :posts => []})
-  end
-
-
-  #
-  # GENSERVER
-  #
-
-  @doc """
-  Start the blog monitor
-  """
-  def init(state) do
-    IO.puts "[info] Started blog monitor for https://github.com/#{@user}/#{@repository}"
-    handle_cast(:check_last_updated, state)
-    {:ok, state}
-  end
-
-  def handle_cast(:check_last_updated, state) do
-    case get()
-      |> decode()
-      |> check_last_updated(state.updated_at)
-    do
-      :gt -> handle_cast(:get_posts, state)
-      _ -> IO.puts "[info] Already have the latest posts"
-    end
-
-    reschedule()
-    {:noreply, state}
-  end
-
-
-  def handle_cast(:get_posts, state) do
-    posts =
-      get("/contents/posts")
-      |> decode()
-      |> parse_posts()
-
-    updated_at =
-      get()
-      |> decode()
-      |> Map.get("updated_at")
-
-    state = state
-      |> Map.put(:updated_at, updated_at)
-      |> Map.put(:posts, posts)
-
-    {:noreply, state}
-  end
-
-  def handle_call(:get_posts, _from, state) do
-    {:reply, Map.get(state, :posts)}
-  end
-
-  def handle_call(:get_updated_at, _from, state) do
-    {:reply, Map.get(state, :updated_at)}
-  end
-
-  def reschedule(time \\ 10 * 1000) do
-    Process.send_after(self(), :check_last_updated, time)
+    {:ok, date, _offset} = DateTime.from_iso8601(pushed_at)
+    DateTime.compare(date, current_date)
   end
 
 end
