@@ -73,6 +73,6 @@ defmodule Monitor do
     end
 
     def reschedule(time \\ 3 * 60 * 1000) do
-      Process.send_after(self(), :check_last_updated, time)
+      Process.send_after(self(), {"$gen_cast", :check_last_updated}, time)
     end
 end
