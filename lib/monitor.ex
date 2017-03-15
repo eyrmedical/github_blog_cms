@@ -23,6 +23,11 @@ defmodule Monitor do
       {:ok, state}
     end
 
+    def handle_info(:check_last_updated, state) do
+      GenServer.cast(__MODULE__, :check_last_updated)
+      {:noreply, state}
+    end
+
 
     def handle_cast(:check_last_updated, state) do
       IO.puts "[info] Checking last updated..."
@@ -72,7 +77,7 @@ defmodule Monitor do
       {:noreply, state}
     end
 
-    def reschedule(time \\ 3 * 60 * 1000) do
-      Process.send_after(self(), {"$gen_cast", :check_last_updated}, time)
+    def reschedule(time \\ 60 * 1000) do
+      Process.send_after(self(), :check_last_updated, time)
     end
 end
