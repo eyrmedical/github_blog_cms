@@ -48,8 +48,8 @@ defmodule Github do
   def parse_posts(posts) when is_list(posts) do
     posts
     |> Enum.map(fn post -> "/contents/posts/" <> post["name"] end)
-    |> Enum.map(fn path -> get(path) |> decode() end)
-    |> Enum.map(fn post -> parse_post(post) end)
+    |> Enum.map(&(Task.async(fn -> get(&1) |> decode() |> parse_post() end)))
+    |> Enum.map(&Task.await/1)
     |> Enum.filter(fn post -> post != :error end)
   end
   def parse_posts(_), do: [:error]
@@ -68,7 +68,7 @@ defmodule Github do
 
       post = Regex.split(~r/\n/, frontmatter, trim: true)
         |> Enum.map(&Regex.split(~r/:\s/, &1, trim: true) |> List.to_tuple)
-        |> Enum.into(%{"post" => post, "filename" => filename})
+        |> Enum.into(%{"post" => post, "filename" => String.replace_suffix(filename, ".md", "")})
 
       date_from_frontmatter = Map.get(post, "date")
       date_from_filename = Regex.run(~r/....-..-../, filename) |> List.to_string
