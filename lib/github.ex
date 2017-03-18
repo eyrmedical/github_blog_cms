@@ -23,10 +23,14 @@ defmodule Github do
     |> HTTPotion.get([headers: ["User-Agent": @user]])
   end
 
-
+  def get(:post, name) do
+    get("/contents/posts/" <> name)
+    |> decode()
+    |> parse_post()
+  end
   # Format the URL
   @spec get_url(String.t()) :: String.t()
-  defp get_url(path \\ "") do
+  defp get_url(path) do
     @api_url <> "/repos/" <> @user <> "/" <> @repository <> path <> "?client_id=#{@client_id}&client_secret=#{@client_secret}"
   end
 
@@ -44,16 +48,6 @@ defmodule Github do
   @doc """
   Parse posts
   """
-  @spec parse_posts([]) :: {:ok, []}
-  def parse_posts(posts) when is_list(posts) do
-    posts
-    |> Enum.map(fn post -> "/contents/posts/" <> post["name"] end)
-    |> Enum.map(&(Task.async(fn -> get(&1) |> decode() |> parse_post() end)))
-    |> Enum.map(&Task.await/1)
-    |> Enum.filter(fn post -> post != :error end)
-  end
-  def parse_posts(_), do: [:error]
-
 
   defp parse_post(%{"content" => content, "name" => filename}) do
     try do

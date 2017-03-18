@@ -3,11 +3,15 @@ defmodule Monitor do
   import Github
 
     def start_link do
-      GenServer.start_link(__MODULE__, %{:pushed_at => :nil, :posts => [], :initialized => false}, name: __MODULE__)
+      GenServer.start_link(__MODULE__, %{:pushed_at => :nil, :posts => [], :active_fetching_post => true}, name: __MODULE__)
     end
 
     def get_posts do
       GenServer.call(__MODULE__, :get_posts)
+    end
+
+    def get_post(name) do
+      GenServer.call(__MODULE__, {:get_post, name})
     end
 
     def refresh do
@@ -28,7 +32,6 @@ defmodule Monitor do
       {:noreply, state}
     end
 
-
     def handle_cast(:check_last_updated, state) do
       IO.puts "[info] Checking last updated..."
       case Github.get()
@@ -47,6 +50,14 @@ defmodule Monitor do
       end
     end
 
+    def handle_call({:get_post, name}, _from, %{active_fetching_post: true} = state) do
+      {:reply, {:error, "Not loaded yet"}, state}
+    end
+
+    def handle_call({:get_post, name}, _from, %{posts: posts} = state) do
+      {:reply, Enum.find(posts, :not_found, fn post -> post["filename"] == name end), state}
+    end
+
     def handle_call(:get_posts, _from, %{active_fetching_post: true} = state) do
       {:reply, {:error, "Not loaded yet"}, state}
     end
@@ -59,7 +70,11 @@ defmodule Monitor do
       posts =
         get("/contents/posts")
         |> decode()
-        |> parse_posts()
+        |> Enum.map(fn post -> post["name"] end)
+        |> Enum.map(&(Task.async(fn -> get(:post, &1) end)))
+        |> Enum.map(&Task.await/1)
+        |> Enum.filter(fn post -> post != :error end)
+        |> IO.inspect
 
       Enum.map(posts, fn post -> Map.get(post, "title") |> IO.inspect end)
 
