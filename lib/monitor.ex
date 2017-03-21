@@ -34,11 +34,7 @@ defmodule Monitor do
 
     def handle_cast(:check_last_updated, state) do
       IO.puts "[info] Checking last updated..."
-      case Github.get()
-        |> decode()
-        |> Map.get("pushed_at", "")
-        |> check_last_updated(state.pushed_at)
-      do
+      case Github.get(:pushed_at) |> check_last_updated(state.pushed_at) do
         :gt ->
           GenServer.cast(__MODULE__, :get_posts)
           reschedule()
@@ -49,6 +45,7 @@ defmodule Monitor do
           {:noreply, state}
       end
     end
+
 
     def handle_call({:get_post, name}, _from, %{active_fetching_post: true} = state) do
       {:reply, {:error, "Not loaded yet"}, state}
@@ -67,9 +64,8 @@ defmodule Monitor do
 
     def handle_cast(:get_posts, state) do
       IO.puts "[info] Getting posts..."
-      posts =
-        get("/contents/posts")
-        |> decode()
+
+      posts = Github.get(:posts)
         |> Enum.map(fn post -> post["name"] end)
         |> Enum.map(&(Task.async(fn -> get(:post, &1) end)))
         |> Enum.map(&Task.await/1)
@@ -79,9 +75,7 @@ defmodule Monitor do
       Enum.map(posts, fn post -> Map.get(post, "title") |> IO.inspect end)
 
       {:ok, pushed_at, _offset} =
-        get()
-        |> decode()
-        |> Map.get("pushed_at", "")
+        Github.get(:pushed_at)
         |> DateTime.from_iso8601()
 
       state = state

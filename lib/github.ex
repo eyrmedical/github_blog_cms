@@ -12,6 +12,26 @@ defmodule Github do
   Documentation for GithubBlogCms.
   """
 
+  def get(:posts) do
+    case get("/contents/posts") |> decode() do
+      :error -> []
+      posts -> posts
+    end
+  end
+
+  def get(:pushed_at) do
+    case get() |> decode() do
+      %{"pushed_at" => pushed_at} -> pushed_at
+      :error -> nil
+    end
+  end
+
+  def get(:post, name) do
+    get("/contents/posts/" <> name)
+    |> decode()
+    |> parse_post()
+  end
+
 
   @doc """
   HTTP request to Github repo from config
@@ -23,11 +43,6 @@ defmodule Github do
     |> HTTPotion.get([headers: ["User-Agent": @user]])
   end
 
-  def get(:post, name) do
-    get("/contents/posts/" <> name)
-    |> decode()
-    |> parse_post()
-  end
   # Format the URL
   @spec get_url(String.t()) :: String.t()
   defp get_url(path) do
@@ -42,7 +57,7 @@ defmodule Github do
   def decode(%HTTPotion.Response{:status_code => 200, :body => body}) do
     Poison.decode!(body)
   end
-  def decode(_), do: {:error, :invalid_response}
+  def decode(_), do: :error
 
 
   @doc """
@@ -82,6 +97,10 @@ defmodule Github do
   current_date it will trigger getting and parsing posts.
   """
   @spec check_last_updated(String.t(), %DateTime{}) :: atom()
+  def check_last_updated(:nil, _current) do
+    IO.puts "[info] no reply from #{@user}/#{@repository}."
+    :eq # default to reschedule check
+  end
   def check_last_updated(_pushed_at, :nil) do
     IO.puts "[info] #{@user}/#{@repository} have not been updated yet."
     :gt # default to get posts
