@@ -61,9 +61,8 @@ defmodule Github do
 
 
   @doc """
-  Parse posts
+  Parse post
   """
-
   defp parse_post(%{"content" => content, "name" => filename}) do
     try do
       post = Base.decode64!(content, ignore: :whitespace)
@@ -98,15 +97,15 @@ defmodule Github do
   """
   @spec check_last_updated(String.t(), %DateTime{}) :: atom()
   def check_last_updated(:nil, _current) do
-    IO.puts "[info] no reply from #{@user}/#{@repository}."
+    Logger.warn "no reply from #{@user}/#{@repository}."
     :eq # default to reschedule check
   end
   def check_last_updated(_pushed_at, :nil) do
-    IO.puts "[info] #{@user}/#{@repository} have not been updated yet."
+    Logger.info "#{@user}/#{@repository} have not been updated yet."
     :gt # default to get posts
   end
   def check_last_updated(pushed_at, current_date) do
-    IO.puts "[info] #{@user}/#{@repository} was last updated at: #{pushed_at}"
+    Logger.info "#{@user}/#{@repository} was last updated at: #{pushed_at}"
 
     {:ok, date, _offset} = DateTime.from_iso8601(pushed_at)
     DateTime.compare(date, current_date)
